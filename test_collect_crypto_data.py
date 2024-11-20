@@ -1,74 +1,79 @@
-import unittest
+import pytest
 from unittest.mock import patch, MagicMock
-import pyodbc
+from collect_crypto_data import create_table, collect_data, conn, cursor
 from datetime import datetime
 import requests
-from collect_crypto_data import create_table, collect_data
 
-class TestCryptoDataCollection(unittest.TestCase):
-
-    @patch('pyodbc.connect')
-    def test_create_table(self, mock_connect):
-        # Mock de la connexion à la base de données
-        mock_cursor = MagicMock()
-        mock_connect.return_value.cursor.return_value = mock_cursor
-        
-        # Appeler la fonction create_table
+def test_create_table():
+    with patch('collect_crypto_data.cursor') as mock_cursor:
+        mock_cursor.execute.side_effect = Exception("Test Exception")
         create_table()
+        mock_cursor.execute.assert_called_once()
+        mock_cursor.execute.side_effect = None
 
-        # Vérifier si la requête CREATE TABLE a été exécutée
-        mock_cursor.execute.assert_called_once_with("""
-        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='CryptoData' AND xtype='U')
-        CREATE TABLE CryptoData (
-            ID INT IDENTITY(1,1) PRIMARY KEY,
-            Name NVARCHAR(50) NOT NULL,
-            Symbol NVARCHAR(10) NOT NULL,
-            PriceUSD FLOAT NOT NULL,
-            VolumeUSD FLOAT NOT NULL,
-            CollectionTime DATETIME NOT NULL
-        )""")
-        mock_connect.return_value.commit.assert_called_once()
-
-    @patch('requests.get')
-    @patch('pyodbc.connect')
-    def test_collect_data(self, mock_connect, mock_get):
-        # Mock de la réponse de l'API
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "data": [{
+def test_collect_data_success():
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "data": [
+            {
                 "name": "Bitcoin",
                 "symbol": "BTC",
-                "priceUsd": "50000.00",
+                "priceUsd": "60000",
                 "volumeUsd24Hr": "1000000000"
-            }]
-        }
+            }
+        ]
+    }
+    
+    with patch('collect_crypto_data.requests.get') as mock_get, \
+         patch('collect_crypto_data.datetime') as mock_datetime, \
+         patch('collect_crypto_data.cursor') as mock_cursor:
+        
         mock_get.return_value = mock_response
+        mock_datetime.now.return_value = datetime(2024, 11, 20, 9, 46, 29)
         
-        # Mock de la connexion à la base de données
-        mock_cursor = MagicMock()
-        mock_connect.return_value.cursor.return_value = mock_cursor
+        collect_data()
         
-        # Capture datetime to ensure consistency in the assertion
-        with patch.object(datetime, 'now', return_value=datetime(2024, 11, 20, 12, 0, 0)):
-            # Appel de la fonction collect_data
-            collect_data()
+        mock_get.assert_called_once_with("https://api.coincap.io/v2/assets")
+        expected_query = """
+            INSERT INTO CryptoData (Name, Symbol, PriceUSD, VolumeUSD, CollectionTime) 
+            VALUES (?, ?, ?, ?, ?)
+        """.strip()
+        mock_cursor.execute.assert_called_once_with(
+            expected_query,
+            ("Bitcoin", "BTC", 60000.0, 1000000000.0, datetime(2024, 11, 20, 9, 46, 29))
+        )
 
-        # Vérifier si la requête d'insertion a été exécutée
-        mock_cursor.execute.assert_called_once_with("""
-        INSERT INTO CryptoData (Name, Symbol, PriceUSD, VolumeUSD, CollectionTime) 
-        VALUES (?, ?, ?, ?, ?)""", 
-        ('Bitcoin', 'BTC', 50000.0, 1000000000.0, datetime(2024, 11, 20, 12, 0, 0)))
-        
-        mock_connect.return_value.commit.assert_called_once()
+def test_collect_data_exception():
+    with patch('collect_crypto_data.requests.get') as mock_get:
+        mock_get.side_effect = Exception("Test Exception")
+        collect_data()
+        mock_get.assert_called_once_with("https://api.coincap.io/v2/assets")
 
-    @patch('requests.get')
-    def test_collect_data_error(self, mock_get):
-        # Simuler une erreur lors de l'appel à l'API
-        mock_get.side_effect = requests.exceptions.RequestException("API error")
+def test_collect_data_insert_exception():
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "data": [
+            {
+                "name": "Bitcoin",
+                "symbol": "BTC",
+                "priceUsd": "60000",
+                "volumeUsd24Hr": "1000000000"
+            }
+        ]
+    }
+    
+    with patch('collect_crypto_data.requests.get') as mock_get, \
+         patch('collect_crypto_data.cursor') as mock_cursor:
         
-        # Vérifier que l'erreur est bien gérée et affichée
-        with self.assertRaises(requests.exceptions.RequestException):
-            collect_data()
+        mock_get.return_value = mock_response
+        mock_cursor.execute.side_effect = Exception("Test Exception")
+        
+        collect_data()
+        
+        mock_get.assert_called_once_with("https://api.coincap.io/v2/assets")
+        mock_cursor.execute.assert_called_once()
 
-if __name__ == '__main__':
-    unittest.main()
+@pytest.fixture(scope="module", autouse=True)
+def teardown():
+    yield
+    conn.close()

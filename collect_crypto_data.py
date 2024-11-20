@@ -55,15 +55,16 @@ def collect_data():
     except Exception as e:
         print(f"Erreur : {e}")
 
-# Création de la table
-create_table()
+if __name__ == "__main__":
+    # Création de la table
+    create_table()
 
-# Boucle de collecte périodique
-try:
-    while True:
-        collect_data()
-        time.sleep(20)  # Pause de 20 secondes
-except KeyboardInterrupt:
-    print("Arrêt du programme.")
-finally:
-    conn.close()
+    # Boucle de collecte périodique
+    try:
+        while True:
+            collect_data()
+            time.sleep(20)  # Pause de 20 secondes
+    except KeyboardInterrupt:
+        print("Arrêt du programme.")
+    finally:
+        conn.close()
