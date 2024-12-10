@@ -1,5 +1,6 @@
 // src/components/CryptoList.js
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 
 const CryptoList = () => {
@@ -33,9 +34,10 @@ const CryptoList = () => {
             <h2>Cryptocurrencies</h2>
             <ul>
                 {cryptos.map(crypto => (
-                    <li key={crypto.ID}> 
+                    <li key={crypto.ID}>
                         <h3>{crypto.Name}</h3>
                         <p>Price: {crypto.PriceUSD}</p>
+                        <Link to={`/crypto/${crypto.ID}`}>View Details</Link> {/* Link to detailed view */}
                     </li>
                 ))}
             </ul>
