@@ -11,7 +11,7 @@ function CryptoDetail() {
 
   useEffect(() => {
     const fetchCrypto = async () => {
-      const result = await axios.get(`/crypto/${id}`);
+      const result = await axios.get(`crypto/${id}`);
       setCrypto(result.data);
       setChartData({
         labels: result.data.prices.map((price) => price.date),

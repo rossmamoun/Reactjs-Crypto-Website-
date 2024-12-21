@@ -1,3 +1,4 @@
+// backend/index.js
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -56,6 +57,47 @@ app.get('/cryptos', async (req, res) => {
         res.status(500).send('Server error');
     }
 });
+
+// New endpoint to fetch detailed crypto information
+app.get('/crypto/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        sql.open(dbConfig.connectionString, (err, conn) => {
+            if (err) {
+                console.error('Database connection failed: ', err);
+                res.status(500).send('Server error');
+                return;
+            }
+
+            conn.query('SELECT * FROM CryptoData WHERE ID = ?', [id], (err, result) => {
+                if (err) {
+                    console.error('Error fetching data: ', err);
+                    res.status(500).send('Server error');
+                    return;
+                }
+
+                const crypto = result[0];
+                // Mock data for historical prices, replace with actual API call if needed
+                const prices = getHistoricalPrices(crypto.Symbol);
+                res.json({ ...crypto, prices });
+                conn.close();
+            });
+        });
+    } catch (err) {
+        console.error('Error fetching data: ', err);
+        res.status(500).send('Server error');
+    }
+});
+
+function getHistoricalPrices(symbol) {
+    // Mock data for historical prices, replace with actual API call
+    return [
+        { date: '2024-12-01', value: 50000 },
+        { date: '2024-12-02', value: 51000 },
+        { date: '2024-12-03', value: 52000 },
+    ];
+}
 
 // Start the server
 app.listen(port, () => {

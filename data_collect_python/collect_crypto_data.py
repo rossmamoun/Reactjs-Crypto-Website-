@@ -12,13 +12,26 @@ conn = pyodbc.connect(
 )
 cursor = conn.cursor()
 
-# Fonction pour créer la table
-def create_table():
+# Create tables if not exists
+def create_tables():
     try:
+        # Create CryptoMapping table
+        cursor.execute("""
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='CryptoMapping' AND xtype='U')
+        CREATE TABLE CryptoMapping (
+            CryptoID INT IDENTITY(1,1) PRIMARY KEY,
+            Symbol NVARCHAR(10) UNIQUE NOT NULL,
+            Name NVARCHAR(50) NOT NULL
+        )
+        """)
+        conn.commit()
+
+        # Create CryptoData table
         cursor.execute("""
         IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='CryptoData' AND xtype='U')
         CREATE TABLE CryptoData (
             ID INT IDENTITY(1,1) PRIMARY KEY,
+            CryptoID INT NOT NULL,
             Name NVARCHAR(50) NOT NULL,
             Symbol NVARCHAR(10) NOT NULL,
             PriceUSD FLOAT NOT NULL,
@@ -27,11 +40,30 @@ def create_table():
         )
         """)
         conn.commit()
-        print("Table 'CryptoData' créée avec succès.")
+        print("Tables created successfully.")
     except Exception as e:
-        print(f"Erreur lors de la création de la table : {e}")
+        print(f"Error creating tables: {e}")
 
-# Fonction pour collecter les données
+# Get or create CryptoID for a cryptocurrency
+def get_or_create_crypto_id(symbol, name):
+    try:
+        # Check if the crypto already exists
+        cursor.execute("SELECT CryptoID FROM CryptoMapping WHERE Symbol = ?", (symbol,))
+        row = cursor.fetchone()
+        if row:
+            return row.CryptoID
+
+        # If not exists, insert it into CryptoMapping
+        cursor.execute("INSERT INTO CryptoMapping (Symbol, Name) VALUES (?, ?)", (symbol, name))
+        conn.commit()
+
+        # Get the newly created CryptoID
+        return cursor.execute("SELECT CryptoID FROM CryptoMapping WHERE Symbol = ?", (symbol,)).fetchone().CryptoID
+    except Exception as e:
+        print(f"Error in get_or_create_crypto_id: {e}")
+        return None
+
+# Collect and store data
 def collect_data():
     url = "https://api.coincap.io/v2/assets"
     try:
@@ -40,31 +72,34 @@ def collect_data():
         cryptos = response.json()["data"]  # Get the list of cryptocurrencies
 
         for crypto in cryptos:
-            name = crypto["name"]
             symbol = crypto["symbol"]
+            name = crypto["name"]
             price_usd = float(crypto["priceUsd"])
             volume_usd = float(crypto["volumeUsd24Hr"])
-            collection_time = datetime.now()  # Get the current timestamp
+            collection_time = datetime.now()
 
-            # Insertion dans la base de données
+            # Get or create the CryptoID
+            crypto_id = get_or_create_crypto_id(symbol, name)
+
+            # Insert data into CryptoData table
             cursor.execute("""
-            INSERT INTO CryptoData (Name, Symbol, PriceUSD, VolumeUSD, CollectionTime) 
-            VALUES (?, ?, ?, ?, ?)""", (name, symbol, price_usd, volume_usd, collection_time))
+            INSERT INTO CryptoData (CryptoID, Name, Symbol, PriceUSD, VolumeUSD, CollectionTime) 
+            VALUES (?, ?, ?, ?, ?, ?)""", (crypto_id, name, symbol, price_usd, volume_usd, collection_time))
         conn.commit()
-        print(f"Données insérées pour {len(cryptos)} cryptomonnaies.")
+        print(f"Data inserted for {len(cryptos)} cryptocurrencies.")
     except Exception as e:
-        print(f"Erreur : {e}")
+        print(f"Error in collect_data: {e}")
 
 if __name__ == "__main__":
-    # Création de la table
-    create_table()
+    # Create tables
+    create_tables()
 
-    # Boucle de collecte périodique
+    # Collect data periodically
     try:
         while True:
             collect_data()
-            time.sleep(20)  # Pause de 20 secondes
+            time.sleep(20)  # Pause for 20 seconds
     except KeyboardInterrupt:
-        print("Arrêt du programme.")
+        print("Stopping the script.")
     finally:
         conn.close()
