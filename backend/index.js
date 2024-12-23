@@ -1,8 +1,7 @@
-// backend/index.js
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const sql = require('msnodesqlv8'); // Import msnodesqlv8 for SQL Server connection
+const sql = require('msnodesqlv8');
 
 const app = express();
 const port = 5000;
@@ -23,81 +22,81 @@ sql.open(dbConfig.connectionString, (err, conn) => {
         return;
     }
     console.log('Connected to the database');
-    // Close the connection
     conn.close();
 });
 
-// Define routes
+// Routes
+
+// Root Route
 app.get('/', (req, res) => {
     res.send('Welcome to the Crypto Data API!');
 });
 
-// Example endpoint to fetch data
-app.get('/cryptos', async (req, res) => {
-    try {
-        sql.open(dbConfig.connectionString, (err, conn) => {
+// Get all cryptos with their latest prices
+app.get('/cryptos', (req, res) => {
+    sql.open(dbConfig.connectionString, (err, conn) => {
+        if (err) {
+            console.error('Database connection failed: ', err);
+            return res.status(500).json({ error: 'Database connection failed' });
+        }
+
+        const query = `
+            SELECT m.CryptoID, m.Symbol, m.Name, d.PriceUSD, d.VolumeUSD, MAX(d.CollectionTime) AS LastUpdated
+            FROM CryptoMapping m
+            JOIN CryptoData d ON m.CryptoID = d.CryptoID
+            GROUP BY m.CryptoID, m.Symbol, m.Name, d.PriceUSD, d.VolumeUSD
+        `;
+
+        conn.query(query, (err, result) => {
             if (err) {
-                console.error('Database connection failed: ', err);
-                res.status(500).send('Server error');
-                return;
+                console.error('Error fetching data: ', err);
+                return res.status(500).json({ error: 'Error fetching data' });
             }
 
-            conn.query('SELECT * FROM CryptoData', (err, result) => {
-                if (err) {
-                    console.error('Error fetching data: ', err);
-                    res.status(500).send('Server error');
-                    return;
-                }
-                res.json(result);
-                conn.close();
-            });
+            res.json(result);
+            conn.close();
         });
-    } catch (err) {
-        console.error('Error fetching data: ', err);
-        res.status(500).send('Server error');
-    }
+    });
 });
 
-// New endpoint to fetch detailed crypto information
-app.get('/crypto/:id', async (req, res) => {
-    const { id } = req.params;
+// Get historical data for a specific crypto
+app.get('/crypto/:cryptoId', (req, res) => {
+    const { cryptoId } = req.params;
 
-    try {
-        sql.open(dbConfig.connectionString, (err, conn) => {
+    // Validate cryptoId
+    if (isNaN(cryptoId)) {
+        return res.status(400).json({ error: 'Invalid crypto ID' });
+    }
+
+    sql.open(dbConfig.connectionString, (err, conn) => {
+        if (err) {
+            console.error('Database connection failed: ', err);
+            return res.status(500).json({ error: 'Database connection failed' });
+        }
+
+        const query = `
+            SELECT d.CryptoID, m.Name, m.Symbol, d.PriceUSD, d.VolumeUSD, d.CollectionTime
+            FROM CryptoData d
+            JOIN CryptoMapping m ON d.CryptoID = m.CryptoID
+            WHERE d.CryptoID = ?
+            ORDER BY d.CollectionTime ASC
+        `;
+
+        conn.query(query, [cryptoId], (err, result) => {
             if (err) {
-                console.error('Database connection failed: ', err);
-                res.status(500).send('Server error');
-                return;
+                console.error('Error fetching data: ', err);
+                return res.status(500).json({ error: 'Error fetching data' });
             }
 
-            conn.query('SELECT * FROM CryptoData WHERE ID = ?', [id], (err, result) => {
-                if (err) {
-                    console.error('Error fetching data: ', err);
-                    res.status(500).send('Server error');
-                    return;
-                }
+            if (result.length === 0) {
+                return res.status(404).json({ error: 'Crypto not found' });
+            }
 
-                const crypto = result[0];
-                // Mock data for historical prices, replace with actual API call if needed
-                const prices = getHistoricalPrices(crypto.Symbol);
-                res.json({ ...crypto, prices });
-                conn.close();
-            });
+            res.json(result);
+            conn.close();
         });
-    } catch (err) {
-        console.error('Error fetching data: ', err);
-        res.status(500).send('Server error');
-    }
+    });
 });
-
-function getHistoricalPrices(symbol) {
-    // Mock data for historical prices, replace with actual API call
-    return [
-        { date: '2024-12-01', value: 50000 },
-        { date: '2024-12-02', value: 51000 },
-        { date: '2024-12-03', value: 52000 },
-    ];
-}
 
 // Start the server
 app.listen(port, () => {
