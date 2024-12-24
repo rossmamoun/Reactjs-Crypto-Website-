@@ -11,11 +11,6 @@ jobs:
           command: |
             cd backend
             npm install
-      - run:
-          name: Run Backend build
-          command: |
-            cd backend
-            npm run build
 
   install-and-test-frontend:
     docker:
