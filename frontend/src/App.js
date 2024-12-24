@@ -10,7 +10,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<CryptoList />} />
-        <Route path="/crypto/:id" element={<CryptoDetail />} /> {/* Define route for detailed view */}
+        <Route path="/crypto/:cryptoId" element={<CryptoDetail />} /> {/* Define route for detailed view */}
       </Routes>
     </Router>
   );
