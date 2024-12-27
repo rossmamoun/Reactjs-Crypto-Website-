@@ -41,10 +41,10 @@ app.get('/cryptos', (req, res) => {
         }
 
         const query = `
-            SELECT m.CryptoID, m.Symbol, m.Name, d.PriceUSD, d.VolumeUSD, MAX(d.CollectionTime) AS LastUpdated
+            SELECT m.CryptoID, m.Symbol, m.Name, MAX(d.PriceUSD) AS LatestPriceUSD, MAX(d.VolumeUSD) AS LatestVolumeUSD, MAX(d.CollectionTime) AS LastUpdated
             FROM CryptoMapping m
             JOIN CryptoData d ON m.CryptoID = d.CryptoID
-            GROUP BY m.CryptoID, m.Symbol, m.Name, d.PriceUSD, d.VolumeUSD
+            GROUP BY m.CryptoID, m.Symbol, m.Name
         `;
 
         conn.query(query, (err, result) => {
@@ -59,11 +59,10 @@ app.get('/cryptos', (req, res) => {
     });
 });
 
-// Get historical data for a specific crypto
+// Get detailed data for a specific crypto
 app.get('/crypto/:cryptoId', (req, res) => {
     const { cryptoId } = req.params;
 
-    // Validate cryptoId
     if (isNaN(cryptoId)) {
         return res.status(400).json({ error: 'Invalid crypto ID' });
     }
@@ -74,7 +73,7 @@ app.get('/crypto/:cryptoId', (req, res) => {
             return res.status(500).json({ error: 'Database connection failed' });
         }
 
-        const query = `
+        const dataQuery = `
             SELECT d.CryptoID, m.Name, m.Symbol, d.PriceUSD, d.VolumeUSD, d.CollectionTime
             FROM CryptoData d
             JOIN CryptoMapping m ON d.CryptoID = m.CryptoID
@@ -82,18 +81,38 @@ app.get('/crypto/:cryptoId', (req, res) => {
             ORDER BY d.CollectionTime ASC
         `;
 
-        conn.query(query, [cryptoId], (err, result) => {
+        const ohlcQuery = `
+            SELECT o.CryptoID, o.Symbol, o.[Open], o.High, o.Low, o.[Close], o.Volume, o.TimeframeStart
+            FROM CryptoOHLC o
+            WHERE o.CryptoID = ?
+            ORDER BY o.TimeframeStart ASC
+        `;
+
+        conn.query(dataQuery, [cryptoId], (err, dataResult) => {
             if (err) {
-                console.error('Error fetching data: ', err);
-                return res.status(500).json({ error: 'Error fetching data' });
+                console.error('Error fetching general data: ', err);
+                conn.close();
+                return res.status(500).json({ error: 'Error fetching general data' });
             }
 
-            if (result.length === 0) {
+            if (dataResult.length === 0) {
+                conn.close();
                 return res.status(404).json({ error: 'Crypto not found' });
             }
 
-            res.json(result);
-            conn.close();
+            conn.query(ohlcQuery, [cryptoId], (err, ohlcResult) => {
+                conn.close();
+
+                if (err) {
+                    console.error('Error fetching OHLC data: ', err);
+                    return res.status(500).json({ error: 'Error fetching OHLC data' });
+                }
+
+                res.json({
+                    general: dataResult,
+                    ohlc: ohlcResult,
+                });
+            });
         });
     });
 });
