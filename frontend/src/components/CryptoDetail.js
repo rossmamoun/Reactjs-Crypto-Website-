@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { Line } from 'react-chartjs-2';
@@ -8,8 +8,9 @@ ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Title, T
 
 const CryptoDetail = () => {
   const { cryptoId } = useParams(); // Get the CryptoID from the URL
-  const [cryptoData, setCryptoData] = useState([]); // Store the fetched data
-  const [chartData, setChartData] = useState(null); // Store data for the chart
+  const [cryptoData, setCryptoData] = useState([]); // State to store the general price data
+  const [chartData, setChartData] = useState(null); // State to store data for the price chart
+  const [ohlcChartData, setOhlcChartData] = useState(null); // State to store OHLC data for candlestick chart
   const [loading, setLoading] = useState(true); // Handle loading state
   const [error, setError] = useState(null); // Handle error state
 
@@ -19,23 +20,24 @@ const CryptoDetail = () => {
         const response = await axios.get(`http://localhost:5000/crypto/${cryptoId}`);
         const data = response.data;
 
-        if (data.length === 0) {
+        if (!data.general || data.general.length === 0) {
           setError('No data found for this cryptocurrency.');
           setLoading(false);
           return;
         }
 
-        setCryptoData(data);
+        // Set general price data
+        setCryptoData(data.general);
 
-        // Prepare data for the chart
-        const labels = data.map(entry => new Date(entry.CollectionTime).toLocaleDateString());
-        const prices = data.map(entry => entry.PriceUSD);
+        // Prepare data for the general price chart
+        const labels = data.general.map(entry => new Date(entry.CollectionTime).toLocaleDateString());
+        const prices = data.general.map(entry => entry.PriceUSD);
 
         setChartData({
           labels,
           datasets: [
             {
-              label: `${data[0].Name} Price (USD)`,
+              label: `${data.general[0].Name} Price (USD)`,
               data: prices,
               borderColor: 'rgba(75, 192, 192, 1)',
               backgroundColor: 'rgba(75, 192, 192, 0.2)',
@@ -45,6 +47,27 @@ const CryptoDetail = () => {
             },
           ],
         });
+
+        // Handle OHLC data if present
+        if (data.ohlc && data.ohlc.length > 0) {
+          const ohlcChartData = {
+            labels: data.ohlc.map(entry => new Date(entry.TimeframeStart).toLocaleString()),
+            datasets: [
+              {
+                label: `${data.general[0].Name} OHLC`,
+                data: data.ohlc.map(entry => ({
+                  x: new Date(entry.TimeframeStart),
+                  y: [entry.Open, entry.High, entry.Low, entry.Close],
+                })),
+                borderColor: 'rgba(255, 99, 132, 1)',
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                borderWidth: 2,
+              },
+            ],
+          };
+
+          setOhlcChartData(ohlcChartData);
+        }
 
         setLoading(false);
       } catch (err) {

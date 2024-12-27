@@ -11,7 +11,6 @@ const CryptoList = () => {
     useEffect(() => {
         axios.get('http://localhost:5000/cryptos')
             .then(response => {
-                // Filter out duplicates and keep the latest entry for each cryptocurrency
                 const uniqueCryptos = [];
                 const seen = new Set();
                 response.data.forEach(crypto => {
@@ -20,22 +19,17 @@ const CryptoList = () => {
                         seen.add(crypto.Symbol);
                     }
                 });
-                setCryptos(uniqueCryptos); // Store filtered data in state
-                setLoading(false); // Set loading to false after data is processed
+                setCryptos(uniqueCryptos); // Store data directly if backend ensures uniqueness
+                setLoading(false);
             })
             .catch(err => {
                 setError(err.message); // Set error message if something goes wrong
-                setLoading(false); // Set loading to false even if error occurs
+                setLoading(false);
             });
     }, []); // Empty array means this effect runs only once after the component mounts
 
-    if (loading) {
-        return <div>Loading...</div>; // Show loading message
-    }
-
-    if (error) {
-        return <div>Error: {error}</div>; // Show error message
-    }
+    if (loading) return <div>Loading cryptocurrency data...</div>; // Show loading message
+    if (error) return <div>Error fetching data: {error}</div>; // Show error message
 
     return (
         <div>
@@ -44,7 +38,7 @@ const CryptoList = () => {
                 {cryptos.map(crypto => (
                     <li key={crypto.CryptoID}> {/* Use CryptoID as the unique key */}
                         <h3>{crypto.Name} ({crypto.Symbol})</h3>
-                        <p>Last Price: ${crypto.PriceUSD.toFixed(2)}</p> {/* Display last price */}
+                        <p>Last Price: ${crypto.LatestPriceUSD}</p> {/* Display last price */}
                         <Link to={`/crypto/${crypto.CryptoID}`}>View Details</Link> {/* Link to detailed view */}
                     </li>
                 ))}
