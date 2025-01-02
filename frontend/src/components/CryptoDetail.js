@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, LineElement, CategoryScale, LinearScale, PointElement, Title, Tooltip, Legend } from 'chart.js';
@@ -8,6 +8,7 @@ ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Title, T
 
 const CryptoDetail = () => {
   const { cryptoId } = useParams(); // Get the CryptoID from the URL
+  const navigate = useNavigate(); // For navigation
   const [cryptoData, setCryptoData] = useState([]); // State to store the general price data
   const [chartData, setChartData] = useState(null); // State to store data for the price chart
   const [ohlcChartData, setOhlcChartData] = useState(null); // State to store OHLC data for candlestick chart
@@ -79,6 +80,10 @@ const CryptoDetail = () => {
     fetchCryptoData();
   }, [cryptoId]);
 
+  const handleCandlestickView = () => {
+    navigate(`/crypto/${cryptoId}/candlestick`);
+  };
+
   if (loading) return <div>Loading...</div>;
   if (error) return <div>{error}</div>;
 
@@ -123,6 +128,9 @@ const CryptoDetail = () => {
           />
         )}
       </div>
+      <button onClick={handleCandlestickView} style={{ marginTop: '20px', padding: '10px 20px', fontSize: '16px' }}>
+        View Candlestick Chart
+      </button>
     </div>
   );
 };

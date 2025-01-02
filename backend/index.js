@@ -2,12 +2,14 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const sql = require('msnodesqlv8');
+const authRoutes = require('./auth');
 
 const app = express();
 const port = 5000;
 
 // Middleware
 app.use(bodyParser.json());
+app.use('/', authRoutes);
 app.use(cors());
 
 // Database configuration
