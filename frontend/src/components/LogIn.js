@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 const Login = () => {
     const [formData, setFormData] = useState({ identifier: '', password: '' });
+    const navigate = useNavigate();
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -12,8 +14,9 @@ const Login = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post('http://localhost:5000/login', formData);
+            const response = await axios.post('http://localhost:5000/login', formData,);
             alert(response.data.message);
+            navigate('/');
         } catch (err) {
             alert(err.response.data.error);
         }

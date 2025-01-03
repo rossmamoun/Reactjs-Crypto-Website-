@@ -4,6 +4,7 @@ const cors = require('cors');
 const sql = require('msnodesqlv8');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 const port = 5000;
@@ -14,6 +15,7 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE'], // Specify allowed HTTP methods
     credentials: true // Allow cookies if needed
 }));
+app.use(cookieParser());
 // Middleware
 app.use(bodyParser.json());
 // Allow OPTIONS requests for CORS preflight
@@ -181,11 +183,19 @@ app.post('/login', async (req, res) => {
             }
 
             const user = rows[0];
-            const isPasswordMatch = await bcrypt.compare(password, user.Password);
+            const isPasswordMatch = await bcrypt.compare(password, user.PasswordHash);
 
             if (!isPasswordMatch) {
                 return res.status(400).json({ error: 'Invalid username/email or password.' });
             }
+            const username = data[0].Username;
+            const token = jwt.sign({ username }, 'your-secret-key', { expiresIn: '1h' });
+            res.cookie('token', token, {
+                httpOnly: true,  // Makes cookie inaccessible via JavaScript
+                sameSite: 'Lax', // Ensures cookie is sent with cross-origin requests
+                secure: false,   // Set true if using HTTPS
+                maxAge: 3600000  // Cookie expires in 1 hour
+            });
 
             res.status(200).json({ message: 'Login successful.', userID: user.UserID });
         });
