@@ -1,3 +1,4 @@
+/*
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -25,7 +26,7 @@ router.post('/signup', async (req, res) => {
             if (err) return res.status(500).json({ error: 'Database connection failed.' });
 
             const query = `
-                INSERT INTO Users (Username, Password, Email) 
+                INSERT INTO Users (Username, PasswordHash, Email) 
                 VALUES (?, ?, ?)
             `;
             conn.query(query, [username, hashedPassword, email], (err) => {
@@ -78,3 +79,4 @@ router.post('/login', async (req, res) => {
 });
 
 module.exports = router;
+*/

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import './CryptoList.css'; // Import the new CSS file
 
 const CryptoList = () => {
-    const [cryptos, setCryptos] = useState([]); // State to hold processed crypto data
-    const [loading, setLoading] = useState(true); // State to handle loading status
-    const [error, setError] = useState(null); // State to handle errors
+    const [cryptos, setCryptos] = useState([]); 
+    const [loading, setLoading] = useState(true); 
+    const [error, setError] = useState(null); 
 
-    // Fetch crypto data from the backend
     useEffect(() => {
         axios.get('http://localhost:5000/cryptos')
             .then(response => {
@@ -19,27 +19,27 @@ const CryptoList = () => {
                         seen.add(crypto.Symbol);
                     }
                 });
-                setCryptos(uniqueCryptos); // Store data directly if backend ensures uniqueness
+                setCryptos(uniqueCryptos);
                 setLoading(false);
             })
             .catch(err => {
-                setError(err.message); // Set error message if something goes wrong
+                setError(err.message);
                 setLoading(false);
             });
-    }, []); // Empty array means this effect runs only once after the component mounts
+    }, []);
 
-    if (loading) return <div>Loading cryptocurrency data...</div>; // Show loading message
-    if (error) return <div>Error fetching data: {error}</div>; // Show error message
+    if (loading) return <div>Loading cryptocurrency data...</div>; 
+    if (error) return <div>Error fetching data: {error}</div>; 
 
     return (
-        <div>
+        <div className="crypto-list-container">
             <h2>Cryptocurrencies</h2>
-            <ul>
+            <ul className="crypto-list">
                 {cryptos.map(crypto => (
-                    <li key={crypto.CryptoID}> {/* Use CryptoID as the unique key */}
+                    <li key={crypto.CryptoID}>
                         <h3>{crypto.Name} ({crypto.Symbol})</h3>
-                        <p>Last Price: ${crypto.LatestPriceUSD}</p> {/* Display last price */}
-                        <Link to={`/crypto/${crypto.CryptoID}`}>View Details</Link> {/* Link to detailed view */}
+                        <p>Last Price: ${crypto.LatestPriceUSD.toFixed(2)}</p>
+                        <Link to={`/crypto/${crypto.CryptoID}`}>View Details</Link>
                     </li>
                 ))}
             </ul>
