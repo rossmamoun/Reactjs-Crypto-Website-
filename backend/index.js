@@ -9,12 +9,13 @@ const cookieParser = require('cookie-parser');
 const app = express();
 const port = 5000;
 
-app.use(cors());
-app.use(cors({
-    origin: 'http://localhost:3000', // Allow requests only from this frontend URL
-    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Specify allowed HTTP methods
-    credentials: true // Allow cookies if needed
-}));
+app.use(
+    cors({
+        origin: 'http://localhost:3000', // Replace with your frontend URL
+        methods: ['GET', 'POST', 'PUT', 'DELETE'], // Specify allowed HTTP methods
+        credentials: true, // Allow credentials (cookies, etc.)
+    })
+);
 app.use(cookieParser());
 // Middleware
 app.use(bodyParser.json());
@@ -188,13 +189,12 @@ app.post('/login', async (req, res) => {
             if (!isPasswordMatch) {
                 return res.status(400).json({ error: 'Invalid username/email or password.' });
             }
-            const username = data[0].Username;
-            const token = jwt.sign({ username }, 'your-secret-key', { expiresIn: '1h' });
+            const username = user.Username;
+            const token = jwt.sign({ username }, 'jwt-secret-key', { expiresIn: '1h' });
             res.cookie('token', token, {
-                httpOnly: true,  // Makes cookie inaccessible via JavaScript
-                sameSite: 'Lax', // Ensures cookie is sent with cross-origin requests
-                secure: false,   // Set true if using HTTPS
-                maxAge: 3600000  // Cookie expires in 1 hour
+                httpOnly: true, // Ensure cookies are not accessible via JavaScript
+                secure: false,  // Set to true if using HTTPS
+                sameSite: 'Lax', // Ensures the cookie is sent with same-site requests
             });
 
             res.status(200).json({ message: 'Login successful.', userID: user.UserID });

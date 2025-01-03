@@ -14,7 +14,9 @@ const Login = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post('http://localhost:5000/login', formData,);
+            const response = await axios.post('http://localhost:5000/login', formData, {
+                withCredentials: true, // Include cookies in requests
+            });
             alert(response.data.message);
             navigate('/');
         } catch (err) {

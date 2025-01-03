@@ -16,7 +16,9 @@ const Signup = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post('http://localhost:5000/signup', formData);
+            const response = await axios.post('http://localhost:5000/signup', formData, {
+                withCredentials: true, // Include cookies in requests
+            });
             alert(response.data.message);
         } catch (err) {
             alert(err.response.data.error);
