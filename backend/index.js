@@ -224,6 +224,65 @@ app.post('/logout', (req, res) => {
     res.status(200).json({ message: 'Logged out successfully' });
 });
 
+app.post('/favorites', (req, res) => {
+    const token = req.cookies.token;
+
+    if (!token) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    jwt.verify(token, 'jwt-secret-key', (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { username } = decoded; // Extract username from token
+        const { cryptoId } = req.body; // Extract cryptoId from request body
+
+        if (!cryptoId) {
+            return res.status(400).json({ error: 'CryptoID is required.' });
+        }
+
+        sql.open(dbConfig.connectionString, (err, conn) => {
+            if (err) {
+                return res.status(500).json({ error: 'Database connection failed.' });
+            }
+
+            // Fetch UserID based on Username
+            const getUserIdQuery = `
+                SELECT UserID FROM Users WHERE Username = ?
+            `;
+            conn.query(getUserIdQuery, [username], (err, rows) => {
+                if (err || rows.length === 0) {
+                    conn.close();
+                    return res.status(500).json({ error: 'Failed to retrieve UserID.' });
+                }
+
+                const userId = rows[0].UserID;
+
+                // Insert into Favorites table
+                const insertQuery = `
+                    INSERT INTO Favorites (UserID, Username, CryptoID) 
+                    VALUES (?, ?, ?)
+                `;
+
+                conn.query(insertQuery, [userId, username, cryptoId], (err) => {
+                    conn.close();
+
+                    if (err) {
+                        if (err.message.includes('UNIQUE')) {
+                            return res.status(400).json({ error: 'Crypto already in favorites.' });
+                        }
+                        return res.status(500).json({ error: 'Failed to add to favorites.' });
+                    }
+
+                    res.status(201).json({ message: 'Added to favorites.' });
+                });
+            });
+        });
+    });
+});
+
 
 // Start the server
 app.listen(port, () => {
