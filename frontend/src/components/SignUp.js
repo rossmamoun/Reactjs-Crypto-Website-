@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 const Signup = () => {
     const [formData, setFormData] = useState({ 
@@ -7,7 +8,7 @@ const Signup = () => {
         email: '', 
         password: '' 
     });
-
+    const navigate = useNavigate();
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
@@ -20,6 +21,7 @@ const Signup = () => {
                 withCredentials: true, // Include cookies in requests
             });
             alert(response.data.message);
+            navigate('/login');
         } catch (err) {
             alert(err.response.data.error);
         }

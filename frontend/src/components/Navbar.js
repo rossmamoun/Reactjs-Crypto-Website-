@@ -21,7 +21,7 @@ const Navbar = () => {
         };
 
         checkAuth();
-    }, []);
+    }, [isAuthenticated]);
 
     // Logout handler
     const handleLogout = async () => {
