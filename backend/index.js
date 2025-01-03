@@ -202,6 +202,29 @@ app.post('/login', async (req, res) => {
     });
 });
 
+app.get('/check', (req, res) => {
+    const token = req.cookies.token; // Read token from cookies
+
+    if (!token) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    jwt.verify(token, 'jwt-secret-key', (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        // Send response with authentication status and username
+        res.status(200).json({ isAuthenticated: true, username: decoded.username });
+    });
+});
+
+app.post('/logout', (req, res) => {
+    res.clearCookie('token'); // Clear the token cookie
+    res.status(200).json({ message: 'Logged out successfully' });
+});
+
+
 // Start the server
 app.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);
