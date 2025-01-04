@@ -53,10 +53,20 @@ app.get('/cryptos', (req, res) => {
         }
 
         const query = `
-            SELECT m.CryptoID, m.Symbol, m.Name, MAX(d.PriceUSD) AS LatestPriceUSD, MAX(d.VolumeUSD) AS LatestVolumeUSD, MAX(d.CollectionTime) AS LastUpdated
+            SELECT 
+                m.CryptoID, 
+                m.Symbol, 
+                m.Name, 
+                d.PriceUSD AS LatestPriceUSD, 
+                d.VolumeUSD AS LatestVolumeUSD, 
+                d.CollectionTime AS LastUpdated
             FROM CryptoMapping m
             JOIN CryptoData d ON m.CryptoID = d.CryptoID
-            GROUP BY m.CryptoID, m.Symbol, m.Name
+            WHERE d.CollectionTime = (
+                SELECT MAX(CollectionTime)
+                FROM CryptoData
+                WHERE CryptoID = d.CryptoID
+            )
         `;
 
         conn.query(query, (err, result) => {
@@ -282,6 +292,57 @@ app.post('/favorites', (req, res) => {
         });
     });
 });
+
+app.get('/favorites', (req, res) => {
+    const token = req.cookies.token;
+
+    if (!token) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    jwt.verify(token, 'jwt-secret-key', (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { username } = decoded; // Extract username from token
+
+        sql.open(dbConfig.connectionString, (err, conn) => {
+            if (err) {
+                return res.status(500).json({ error: 'Database connection failed.' });
+            }
+
+            const query = `
+                SELECT 
+                    f.CryptoID, 
+                    m.Name, 
+                    m.Symbol, 
+                    d.PriceUSD AS LatestPriceUSD, 
+                    d.VolumeUSD AS LatestVolumeUSD
+                FROM Favorites f
+                JOIN CryptoMapping m ON f.CryptoID = m.CryptoID
+                JOIN CryptoData d ON f.CryptoID = d.CryptoID
+                WHERE f.Username = ?
+                  AND d.CollectionTime = (
+                      SELECT MAX(CollectionTime) 
+                      FROM CryptoData 
+                      WHERE CryptoID = f.CryptoID
+                  )
+            `;
+
+            conn.query(query, [username], (err, result) => {
+                conn.close();
+
+                if (err) {
+                    return res.status(500).json({ error: 'Failed to fetch favorites.' });
+                }
+
+                res.json(result);
+            });
+        });
+    });
+});
+
 
 
 // Start the server
