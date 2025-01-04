@@ -7,8 +7,11 @@ const Sidebar = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    useEffect(() => {
-        axios.get('http://localhost:5000/favorites', { withCredentials: true })
+    // Fetch favorites
+    const fetchFavorites = () => {
+        setLoading(true);
+        axios
+            .get('http://localhost:5000/favorites', { withCredentials: true })
             .then((response) => {
                 setFavorites(response.data);
                 setLoading(false);
@@ -17,7 +20,26 @@ const Sidebar = () => {
                 setError(err.response?.data?.error || 'Failed to fetch favorites.');
                 setLoading(false);
             });
+    };
+
+    useEffect(() => {
+        fetchFavorites();
     }, []);
+
+    // Remove from favorites
+    const removeFromFavorites = async (cryptoID) => {
+        try {
+            const response = await axios.delete(`http://localhost:5000/favorites/${cryptoID}`, {
+                withCredentials: true,
+            });
+            alert(response.data.message);
+
+            // Refresh the favorites list
+            fetchFavorites();
+        } catch (err) {
+            alert(err.response?.data?.error || 'Failed to remove from favorites.');
+        }
+    };
 
     if (loading) return <div>Loading Favorites...</div>;
     if (error) return <div>{error}</div>;
@@ -25,27 +47,22 @@ const Sidebar = () => {
     return (
         <div className="sidebar">
             <h3>Your Favorites</h3>
-            <ul>
-                {favorites.map((crypto) => (
-                    <li key={crypto.CryptoID}>
-                        <h4>{crypto.Name} ({crypto.Symbol})</h4>
-                        <p>Last Price: ${crypto.LatestPriceUSD.toFixed(2)}</p>
-                        <Link to={`/crypto/${crypto.CryptoID}`}>View Chart</Link>
-                        <button
-                            onClick={async () => {
-                                try {
-                                    await axios.delete(`http://localhost:5000/favorites/${crypto.CryptoID}`, { withCredentials: true });
-                                    setFavorites(favorites.filter((fav) => fav.CryptoID !== crypto.CryptoID));
-                                } catch (err) {
-                                    alert('Failed to remove from favorites.');
-                                }
-                            }}
-                        >
-                            Remove
-                        </button>
-                    </li>
-                ))}
-            </ul>
+            {favorites.length === 0 ? (
+                <p>No favorites added yet.</p>
+            ) : (
+                <ul>
+                    {favorites.map((crypto) => (
+                        <li key={crypto.CryptoID}>
+                            <h4>
+                                {crypto.Name} ({crypto.Symbol})
+                            </h4>
+                            <p>Last Price: ${crypto.LatestPriceUSD?.toFixed(2) || 'N/A'}</p>
+                            <Link to={`/crypto/${crypto.CryptoID}`}>View Chart</Link>
+                            <button onClick={() => removeFromFavorites(crypto.CryptoID)}>Remove</button>
+                        </li>
+                    ))}
+                </ul>
+            )}
         </div>
     );
 };

@@ -343,6 +343,47 @@ app.get('/favorites', (req, res) => {
     });
 });
 
+app.delete('/favorites/:cryptoID', (req, res) => {
+    const token = req.cookies.token;
+
+    if (!token) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    jwt.verify(token, 'jwt-secret-key', (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { username } = decoded; // Extract username from the token
+        const { cryptoID } = req.params; // Get CryptoID from the route parameter
+
+        if (!cryptoID) {
+            return res.status(400).json({ error: 'CryptoID is required.' });
+        }
+
+        sql.open(dbConfig.connectionString, (err, conn) => {
+            if (err) {
+                return res.status(500).json({ error: 'Database connection failed.' });
+            }
+
+            const query = `
+                DELETE FROM Favorites 
+                WHERE Username = ? AND CryptoID = ?
+            `;
+
+            conn.query(query, [username, cryptoID], (err) => {
+                conn.close();
+
+                if (err) {
+                    return res.status(500).json({ error: 'Failed to remove from favorites.' });
+                }
+
+                res.status(200).json({ message: 'Removed from favorites.' });
+            });
+        });
+    });
+});
 
 
 // Start the server
