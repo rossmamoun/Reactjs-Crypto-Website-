@@ -1,18 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { Chart as ChartJS, CategoryScale, LinearScale, TimeScale, Title, Tooltip, Legend } from 'chart.js';
-import { CandlestickController, CandlestickElement } from 'chartjs-chart-financial';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  TimeScale,
+  Tooltip,
+  Title,
+} from 'chart.js';
+import {
+  CandlestickController,
+  CandlestickElement,
+} from 'chartjs-chart-financial';
 import { Chart } from 'react-chartjs-2';
-import 'chartjs-adapter-date-fns'; // Ensure date adapter is imported
+import 'chartjs-adapter-date-fns';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
   TimeScale,
-  Title,
   Tooltip,
-  Legend,
+  Title,
   CandlestickController,
   CandlestickElement
 );
@@ -26,16 +35,16 @@ const CandlestickChart = () => {
   useEffect(() => {
     const fetchOHLCData = async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/crypto/${cryptoId}`);
-        const ohlcData = response.data.ohlc;
+        const response = await axios.get(`http://localhost:5000/crypto/${cryptoId}/ohlc`);
+        const data = response.data;
 
-        if (!ohlcData || ohlcData.length === 0) {
-          setError('No OHLC data found for this cryptocurrency.');
+        if (data.length === 0) {
+          setError('No OHLC data available for this cryptocurrency.');
           setLoading(false);
           return;
         }
 
-        const financialData = ohlcData.map(entry => ({
+        const financialData = data.map(entry => ({
           x: new Date(entry.TimeframeStart),
           o: entry.Open,
           h: entry.High,
@@ -46,12 +55,12 @@ const CandlestickChart = () => {
         setChartData({
           datasets: [
             {
-              label: `${response.data.general[0].Name} OHLC`,
+              label: `${data[0].Symbol} Candlestick Data`,
               data: financialData,
-              color: {
-                up: 'rgba(75, 192, 192, 1)',
-                down: 'rgba(255, 99, 132, 1)',
-              },
+              borderColor: 'rgba(75, 192, 192, 1)',
+              backgroundColor: 'rgba(75, 192, 192, 0.2)',
+              barPercentage: 0.03, // Reduce candlestick width
+              categoryPercentage: 1.5, // Add spacing between candlesticks
             },
           ],
         });
@@ -66,7 +75,7 @@ const CandlestickChart = () => {
     fetchOHLCData();
   }, [cryptoId]);
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div>Loading Candlestick Chart...</div>;
   if (error) return <div>{error}</div>;
 
   return (
@@ -81,7 +90,11 @@ const CandlestickChart = () => {
             plugins: {
               title: {
                 display: true,
-                text: 'Candlestick Chart',
+                text: `${chartData.datasets[0].label}`,
+              },
+              tooltip: {
+                mode: 'index',
+                intersect: false,
               },
             },
             scales: {
@@ -100,6 +113,7 @@ const CandlestickChart = () => {
                   display: true,
                   text: 'Price (USD)',
                 },
+                beginAtZero: false,
               },
             },
           }}

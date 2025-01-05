@@ -103,6 +103,36 @@ app.get('/crypto/:cryptoId', (req, res) => {
             ORDER BY d.CollectionTime ASC
         `;
 
+        conn.query(dataQuery, [cryptoId], (err, dataResult) => {
+            conn.close();
+
+            if (err) {
+                console.error('Error fetching general data: ', err);
+                return res.status(500).json({ error: 'Error fetching general data' });
+            }
+
+            if (dataResult.length === 0) {
+                return res.status(404).json({ error: 'Crypto not found' });
+            }
+
+            res.json(dataResult);
+        });
+    });
+});
+
+app.get('/crypto/:cryptoId/ohlc', (req, res) => {
+    const { cryptoId } = req.params;
+
+    if (isNaN(cryptoId)) {
+        return res.status(400).json({ error: 'Invalid crypto ID' });
+    }
+
+    sql.open(dbConfig.connectionString, (err, conn) => {
+        if (err) {
+            console.error('Database connection failed: ', err);
+            return res.status(500).json({ error: 'Database connection failed' });
+        }
+
         const ohlcQuery = `
             SELECT o.CryptoID, o.Symbol, o.[Open], o.High, o.Low, o.[Close], o.Volume, o.TimeframeStart
             FROM CryptoOHLC o
@@ -110,34 +140,19 @@ app.get('/crypto/:cryptoId', (req, res) => {
             ORDER BY o.TimeframeStart ASC
         `;
 
-        conn.query(dataQuery, [cryptoId], (err, dataResult) => {
+        conn.query(ohlcQuery, [cryptoId], (err, ohlcResult) => {
+            conn.close();
+
             if (err) {
-                console.error('Error fetching general data: ', err);
-                conn.close();
-                return res.status(500).json({ error: 'Error fetching general data' });
+                console.error('Error fetching OHLC data: ', err);
+                return res.status(500).json({ error: 'Error fetching OHLC data' });
             }
 
-            if (dataResult.length === 0) {
-                conn.close();
-                return res.status(404).json({ error: 'Crypto not found' });
-            }
-
-            conn.query(ohlcQuery, [cryptoId], (err, ohlcResult) => {
-                conn.close();
-
-                if (err) {
-                    console.error('Error fetching OHLC data: ', err);
-                    return res.status(500).json({ error: 'Error fetching OHLC data' });
-                }
-
-                res.json({
-                    general: dataResult,
-                    ohlc: ohlcResult,
-                });
-            });
+            res.json(ohlcResult);
         });
     });
 });
+
 
 app.post('/signup', async (req, res) => {
     const { username, password, email } = req.body;
