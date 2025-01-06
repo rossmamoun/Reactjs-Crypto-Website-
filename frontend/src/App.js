@@ -10,9 +10,10 @@ import LogIn from './components/LogIn';
 import Sidebar from './components/Sidebar';
 import './App.css';
 
+
 function App() {
   return (
-    <Router>
+    <Router>  
       <div className="app-container">
         <Navbar />
         <div className="content-container">

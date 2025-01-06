@@ -1,15 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
 
 const Sidebar = () => {
     const [favorites, setFavorites] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Fetch favorites
-    const fetchFavorites = () => {
-        setLoading(true);
+    useEffect(() => {
         axios
             .get('http://localhost:5000/favorites', { withCredentials: true })
             .then((response) => {
@@ -20,24 +18,16 @@ const Sidebar = () => {
                 setError(err.response?.data?.error || 'Failed to fetch favorites.');
                 setLoading(false);
             });
-    };
-
-    useEffect(() => {
-        fetchFavorites();
     }, []);
 
-    // Remove from favorites
     const removeFromFavorites = async (cryptoID) => {
         try {
-            const response = await axios.delete(`http://localhost:5000/favorites/${cryptoID}`, {
+            await axios.delete(`http://localhost:5000/favorites/${cryptoID}`, {
                 withCredentials: true,
             });
-            alert(response.data.message);
-
-            // Refresh the favorites list
-            fetchFavorites();
+            setFavorites(favorites.filter((fav) => fav.CryptoID !== cryptoID));
         } catch (err) {
-            alert(err.response?.data?.error || 'Failed to remove from favorites.');
+            alert('Failed to remove from favorites.');
         }
     };
 
@@ -45,24 +35,30 @@ const Sidebar = () => {
     if (error) return <div>{error}</div>;
 
     return (
-        <div className="sidebar">
-            <h3>Your Favorites</h3>
-            {favorites.length === 0 ? (
-                <p>No favorites added yet.</p>
-            ) : (
-                <ul>
-                    {favorites.map((crypto) => (
-                        <li key={crypto.CryptoID}>
-                            <h4>
+        <div className="h-screen w-64 bg-base-200 shadow-lg p-4 overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4">Your Favorites</h2>
+            <ul className="menu bg-base-100 rounded-box">
+                {favorites.length > 0 ? (
+                    favorites.map((crypto) => (
+                        <li key={crypto.CryptoID} className="mb-2">
+                            <Link to={`/crypto/${crypto.CryptoID}`} className="text-blue-500">
                                 {crypto.Name} ({crypto.Symbol})
-                            </h4>
-                            <p>Last Price: ${crypto.LatestPriceUSD?.toFixed(2) || 'N/A'}</p>
-                            <Link to={`/crypto/${crypto.CryptoID}`}>View Chart</Link>
-                            <button onClick={() => removeFromFavorites(crypto.CryptoID)}>Remove</button>
+                            </Link>
+                            <p className="text-sm text-gray-600">
+                                Last Price: ${crypto.LatestPriceUSD.toFixed(2)}
+                            </p>
+                            <button
+                                className="btn btn-sm btn-error mt-1"
+                                onClick={() => removeFromFavorites(crypto.CryptoID)}
+                            >
+                                Remove from favorites
+                            </button>
                         </li>
-                    ))}
-                </ul>
-            )}
+                    ))
+                ) : (
+                    <li className="text-gray-500">No favorites added yet.</li>
+                )}
+            </ul>
         </div>
     );
 };
