@@ -1,129 +1,211 @@
-import pytest
-from unittest.mock import patch, MagicMock
-from collect_crypto_data import create_tables, collect_data, get_or_create_crypto_id, conn, cursor
+import unittest
+from unittest.mock import patch, MagicMock, call
+import requests
 from datetime import datetime
+import io
+from contextlib import redirect_stdout
 
+# On importe le module principal (assure-toi que le nom de fichier est correct)
+import collect_crypto_data
 
-# Test for create_tables function
-def test_create_tables():
-    with patch('collect_crypto_data.cursor') as mock_cursor:
-        mock_cursor.execute.side_effect = Exception("Test Exception")
-        create_tables()
-        mock_cursor.execute.assert_called()  # Check that execute was called
-        mock_cursor.execute.side_effect = None
+class TestCollectCryptoData(unittest.TestCase):
+    # -------------------------------------------------------------------------
+    # create_tables
+    # -------------------------------------------------------------------------
+    @patch('collect_crypto_data.conn')
+    @patch('collect_crypto_data.cursor')
+    def test_create_tables_success(self, mock_cursor, mock_conn):
+        f = io.StringIO()
+        with redirect_stdout(f):
+            collect_crypto_data.create_tables()
+        output = f.getvalue()
+        # Vérification basique
+        self.assertIn("Tables created successfully.", output)
+        self.assertTrue(mock_cursor.execute.called)
+        self.assertTrue(mock_conn.commit.called)
 
+    @patch('collect_crypto_data.conn')
+    @patch('collect_crypto_data.cursor')
+    def test_create_tables_exception(self, mock_cursor, mock_conn):
+        mock_cursor.execute.side_effect = Exception("Test exception in create_tables")
+        f = io.StringIO()
+        with redirect_stdout(f):
+            collect_crypto_data.create_tables()
+        output = f.getvalue()
+        self.assertIn("Error creating tables: Test exception in create_tables", output)
 
-# Test for get_or_create_crypto_id function
-def test_get_or_create_crypto_id():
-    with patch('collect_crypto_data.cursor') as mock_cursor:
-        # Simulate that the crypto does not exist
-        mock_cursor.fetchone.return_value = None
-        mock_cursor.execute.return_value = None
-
-        # Call the function to insert a new crypto
-        crypto_id = get_or_create_crypto_id("BTC", "Bitcoin")
-
-        # Verify insert query was called for a new crypto
-        mock_cursor.execute.assert_any_call(
-            "INSERT INTO CryptoMapping (Symbol, Name) VALUES (?, ?)", ("BTC", "Bitcoin")
-        )
-
-        # Simulate fetching the newly inserted crypto_id
-        mock_cursor.fetchone.return_value = MagicMock(CryptoID=1)
-        mock_cursor.execute.assert_any_call(
+    # -------------------------------------------------------------------------
+    # get_or_create_crypto_id
+    # -------------------------------------------------------------------------
+    @patch('collect_crypto_data.conn')
+    @patch('collect_crypto_data.cursor')
+    def test_get_or_create_crypto_id_existing(self, mock_cursor, mock_conn):
+        mock_cursor.fetchone.return_value = MagicMock(CryptoID=42)
+        result = collect_crypto_data.get_or_create_crypto_id("BTC", "Bitcoin")
+        self.assertEqual(result, 42)
+        mock_cursor.execute.assert_called_with(
             "SELECT CryptoID FROM CryptoMapping WHERE Symbol = ?", ("BTC",)
         )
 
-        # Ensure it returns the correct crypto_id
-        assert crypto_id == 1
-
-
-# Test for collect_data function (success case)
-def test_collect_data_success():
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "data": [
-            {
-                "name": "Bitcoin",
-                "symbol": "BTC",
-                "priceUsd": "60000",
-                "volumeUsd24Hr": "1000000000"
-            }
+    @patch('collect_crypto_data.conn')
+    @patch('collect_crypto_data.cursor')
+    def test_get_or_create_crypto_id_new(self, mock_cursor, mock_conn):
+        """
+        Symbol n'existe pas => SELECT => None
+        Puis on INSERT => et on refait SELECT => CryptoID=999
+        """
+        # fetchone() : 1er appel => None (pas trouvé)
+        #              2e appel => renvoie un objet simulé avec CryptoID=999
+        mock_cursor.fetchone.side_effect = [
+            None,
+            MagicMock(CryptoID=999)
         ]
-    }
+        # .execute est appelé 3 fois (SELECT, INSERT, SELECT)
+        mock_cursor.execute.side_effect = [None, None, None]
 
-    with patch('collect_crypto_data.requests.get') as mock_get, \
-         patch('collect_crypto_data.get_or_create_crypto_id') as mock_get_or_create_id, \
-         patch('collect_crypto_data.cursor') as mock_cursor, \
-         patch('collect_crypto_data.datetime') as mock_datetime:
+        result = collect_crypto_data.get_or_create_crypto_id("NEW", "NewCoin")
+        self.assertEqual(result, 999)
 
-        # Mock the response and timestamp
+        # Vérif qu'on a bien fait un SELECT, puis un INSERT, puis un SELECT
+        self.assertEqual(mock_cursor.execute.call_args_list, [
+            call("SELECT CryptoID FROM CryptoMapping WHERE Symbol = ?", ("NEW",)),
+            call("INSERT INTO CryptoMapping (Symbol, Name) VALUES (?, ?)", ("NEW", "NewCoin")),
+            call("SELECT CryptoID FROM CryptoMapping WHERE Symbol = ?", ("NEW",))
+        ])
+
+    @patch('collect_crypto_data.conn')
+    @patch('collect_crypto_data.cursor')
+    def test_get_or_create_crypto_id_exception(self, mock_cursor, mock_conn):
+        mock_cursor.execute.side_effect = Exception("Test exception in get_or_create_crypto_id")
+        f = io.StringIO()
+        with redirect_stdout(f):
+            result = collect_crypto_data.get_or_create_crypto_id("ANY", "AnyCoin")
+        output = f.getvalue()
+        self.assertIsNone(result)
+        self.assertIn("Error in get_or_create_crypto_id: Test exception in get_or_create_crypto_id", output)
+
+    # -------------------------------------------------------------------------
+    # collect_data
+    # -------------------------------------------------------------------------
+    @patch('collect_crypto_data.get_or_create_crypto_id', return_value=1)
+    @patch('collect_crypto_data.requests.get')
+    @patch('collect_crypto_data.conn')
+    @patch('collect_crypto_data.cursor')
+    def test_collect_data_success(self, mock_cursor, mock_conn, mock_get, mock_get_or_create_id):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "data": [
+                {"symbol": "BTC", "name": "Bitcoin", "priceUsd": "50000", "volumeUsd24Hr": "1000000"}
+            ]
+        }
         mock_get.return_value = mock_response
-        mock_get_or_create_id.return_value = 1
-        mock_datetime.now.return_value = datetime(2024, 11, 20, 9, 46, 29)
 
-        # Call the function
-        collect_data()
-
-        # Check if the API call was made
-        mock_get.assert_called_once_with("https://api.coincap.io/v2/assets")
-
-        # Verify the correct query was executed
-        expected_query = """
+        f = io.StringIO()
+        with redirect_stdout(f):
+            collect_crypto_data.collect_data()
+        output = f.getvalue()
+        self.assertIn("Data inserted for 1 cryptocurrencies.", output)
+        mock_cursor.execute.assert_called_with(
+            """
             INSERT INTO CryptoData (CryptoID, Name, Symbol, PriceUSD, VolumeUSD, CollectionTime) 
-            VALUES (?, ?, ?, ?, ?, ?)
-        """.strip()
-        mock_cursor.execute.assert_called_once_with(
-            expected_query,
-            (1, "Bitcoin", "BTC", 60000.0, 1000000000.0, datetime(2024, 11, 20, 9, 46, 29))
+            VALUES (?, ?, ?, ?, ?, ?)""",
+            (1, 'Bitcoin', 'BTC', 50000.0, 1000000.0, mock_cursor.execute.call_args[0][1][5])
         )
 
+    @patch('collect_crypto_data.requests.get')
+    @patch('collect_crypto_data.conn')
+    @patch('collect_crypto_data.cursor')
+    def test_collect_data_exception(self, mock_cursor, mock_conn, mock_get):
+        mock_get.side_effect = requests.exceptions.RequestException("Test exception in collect_data")
+        f = io.StringIO()
+        with redirect_stdout(f):
+            collect_crypto_data.collect_data()
+        output = f.getvalue()
+        self.assertIn("Error in collect_data: Test exception in collect_data", output)
 
-# Test for collect_data function with API exception
-def test_collect_data_api_exception():
-    with patch('collect_crypto_data.requests.get') as mock_get:
-        mock_get.side_effect = Exception("Test Exception")
-        collect_data()
-        mock_get.assert_called_once_with("https://api.coincap.io/v2/assets")
-
-
-# Test for collect_data function with database insert exception
-def test_collect_data_insert_exception():
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "data": [
-            {
-                "name": "Bitcoin",
-                "symbol": "BTC",
-                "priceUsd": "60000",
-                "volumeUsd24Hr": "1000000000"
-            }
+    # -------------------------------------------------------------------------
+    # fetch_and_store_all_ohlc
+    # -------------------------------------------------------------------------
+    @patch('collect_crypto_data.conn')
+    @patch('collect_crypto_data.cursor')
+    @patch('collect_crypto_data.requests.get')
+    def test_fetch_and_store_all_ohlc_success(self, mock_get, mock_cursor, mock_conn):
+        """
+        On veut simuler l'INSERT (et donc 'Inserted OHLC data...')
+        => on fixe fetchone() = (0,) pour faire passer "if not exists" == True
+        """
+        # Simule 1 crypto dans CryptoMapping
+        mock_cursor.fetchall.return_value = [
+            MagicMock(CryptoID=1, Symbol='BTC')
         ]
-    }
+        # "exists" = 0 => on doit faire un INSERT
+        mock_cursor.fetchone.return_value = (0,)
 
-    with patch('collect_crypto_data.requests.get') as mock_get, \
-         patch('collect_crypto_data.get_or_create_crypto_id') as mock_get_or_create_id, \
-         patch('collect_crypto_data.cursor') as mock_cursor:
-
-        # Mock the API response and crypto_id lookup
+        # Réponse simulée de l'API
+        mock_response = MagicMock()
+        mock_response.json.return_value = [
+            [1609459200000, "29000.0", "29500.0", "28500.0", "29000.0", "1000.0"]
+        ]
         mock_get.return_value = mock_response
-        mock_get_or_create_id.return_value = 1
 
-        # Simulate an exception during database insert
-        mock_cursor.execute.side_effect = Exception("Test Exception")
+        f = io.StringIO()
+        with redirect_stdout(f):
+            collect_crypto_data.fetch_and_store_all_ohlc()
+        output = f.getvalue()
 
-        # Call the function
-        collect_data()
+        # On vérifie que "Inserted OHLC data..." et "OHLC data updated..." apparaissent
+        self.assertIn("Inserted OHLC data for BTC at 2021-01-01 00:00:00", output)
+        self.assertIn("OHLC data updated for BTC", output)
 
-        # Verify the API was called
-        mock_get.assert_called_once_with("https://api.coincap.io/v2/assets")
+    @patch('collect_crypto_data.conn')
+    @patch('collect_crypto_data.cursor')
+    @patch('collect_crypto_data.requests.get')
+    def test_fetch_and_store_all_ohlc_exception_request(self, mock_get, mock_cursor, mock_conn):
+        mock_cursor.fetchall.return_value = [
+            MagicMock(CryptoID=1, Symbol='BTC')
+        ]
+        mock_get.side_effect = requests.exceptions.RequestException("Test exception in fetch_and_store_all_ohlc")
 
-        # Check if the insert query was attempted
-        mock_cursor.execute.assert_called()
+        f = io.StringIO()
+        with redirect_stdout(f):
+            collect_crypto_data.fetch_and_store_all_ohlc()
+        output = f.getvalue()
+        self.assertIn("Error fetching OHLC data for BTC: Test exception in fetch_and_store_all_ohlc", output)
+
+    @patch('collect_crypto_data.conn')
+    @patch('collect_crypto_data.cursor')
+    def test_fetch_and_store_all_ohlc_exception_fetch(self, mock_cursor, mock_conn):
+        mock_cursor.execute.side_effect = Exception("Test global exception in fetch_and_store_all_ohlc")
+        f = io.StringIO()
+        with redirect_stdout(f):
+            collect_crypto_data.fetch_and_store_all_ohlc()
+        output = f.getvalue()
+        self.assertIn("Error fetching all OHLC data: Test global exception in fetch_and_store_all_ohlc", output)
+
+    # -------------------------------------------------------------------------
+    # Test de la boucle principale
+    # -------------------------------------------------------------------------
+    @patch('collect_crypto_data.conn')
+    @patch('collect_crypto_data.create_tables')
+    @patch('collect_crypto_data.collect_data')
+    @patch('collect_crypto_data.fetch_and_store_all_ohlc')
+    @patch('collect_crypto_data.time.sleep', side_effect=KeyboardInterrupt("Stopped for test"))
+    def test_main_loop(self, mock_sleep, mock_fetch, mock_collect, mock_create, mock_conn):
+        """
+        Teste la fonction main_loop() qui contient la boucle infinie.
+        On simule un KeyboardInterrupt pour vérifier le finally: conn.close().
+        """
+        f = io.StringIO()
+        with self.assertRaises(KeyboardInterrupt):
+            with redirect_stdout(f):
+                collect_crypto_data.main_loop()
+
+        output = f.getvalue()
+        self.assertIn("Waiting for the next interval...", output)
+        self.assertIn("Stopping the script.", output)
+        # On vérifie que la connexion est fermée
+        self.assertTrue(mock_conn.close.called)
 
 
-# Fixture to clean up database connection
-@pytest.fixture(scope="module", autouse=True)
-def teardown():
-    yield
-    conn.close()
+if __name__ == '__main__':
+    unittest.main()

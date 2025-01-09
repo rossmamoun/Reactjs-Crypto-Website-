@@ -1,0 +1,6 @@
+projectKey=application_gla_crypto
+serverUrl=http://localhost:9000
+serverVersion=25.1.0.102122
+dashboardUrl=http://localhost:9000/dashboard?id=application_gla_crypto
+ceTaskId=e5bc1c7c-da38-4291-9228-c068f645be39
+ceTaskUrl=http://localhost:9000/api/ce/task?id=e5bc1c7c-da38-4291-9228-c068f645be39

@@ -10,6 +10,10 @@ const nodemailer = require('nodemailer');
 const app = express();
 const port = 5000;
 
+
+
+module.exports = app; // Export app for testing
+
 app.use(
     cors({
         origin: 'http://localhost:3000', // Replace with your frontend URL

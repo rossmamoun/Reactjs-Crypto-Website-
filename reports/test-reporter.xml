@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testExecutions version="1">
+    <file path="C:\Users\UTILISATEUR\application-gla-crypto\frontend\src\App.test.js">
+    </file>
+    <file path="C:\Users\UTILISATEUR\application-gla-crypto\backend\__tests__\index.test.js">
+        <testCase name="index.js routes tests GET / should return welcome message" duration="39"/>
+        <testCase name="index.js routes tests GET /cryptos should return 200 and an array (mocked)" duration="5006">
+            <failure message="Error: thrown: &quot;Exceeded timeout of 5000 ms for a test."><![CDATA[Error: thrown: "Exceeded timeout of 5000 ms for a test.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout."
+    at test (C:\Users\UTILISATEUR\application-gla-crypto\backend\__tests__\index.test.js:66:3)
+    at _dispatchDescribe (C:\Users\UTILISATEUR\application-gla-crypto\node_modules\jest-circus\build\index.js:91:26)
+    at describe (C:\Users\UTILISATEUR\application-gla-crypto\node_modules\jest-circus\build\index.js:55:5)
+    at Object.describe (C:\Users\UTILISATEUR\application-gla-crypto\backend\__tests__\index.test.js:52:1)
+    at Runtime._execModule (C:\Users\UTILISATEUR\application-gla-crypto\node_modules\jest-runtime\build\index.js:1439:24)
+    at Runtime._loadModule (C:\Users\UTILISATEUR\application-gla-crypto\node_modules\jest-runtime\build\index.js:1022:12)
+    at Runtime.requireModule (C:\Users\UTILISATEUR\application-gla-crypto\node_modules\jest-runtime\build\index.js:882:12)
+    at jestAdapter (C:\Users\UTILISATEUR\application-gla-crypto\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (C:\Users\UTILISATEUR\application-gla-crypto\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (C:\Users\UTILISATEUR\application-gla-crypto\node_modules\jest-runner\build\runTest.js:444:34)
+    at Object.worker (C:\Users\UTILISATEUR\application-gla-crypto\node_modules\jest-runner\build\testWorker.js:106:12)]]></failure>
+        </testCase>
+        <testCase name="index.js routes tests GET /crypto/:cryptoId with invalid param should return 400" duration="5"/>
+        <testCase name="index.js routes tests GET /crypto/:cryptoId not found should return 404" duration="3"/>
+        <testCase name="index.js routes tests GET /crypto/:cryptoId success returns array" duration="4"/>
+        <testCase name="index.js routes tests GET /crypto/:cryptoId/ohlc with invalid param should return 400" duration="5"/>
+        <testCase name="index.js routes tests GET /crypto/:cryptoId/ohlc success returns array" duration="8"/>
+        <testCase name="index.js routes tests POST /signup missing body should return 400" duration="41"/>
+        <testCase name="index.js routes tests POST /signup success should return 201" duration="61"/>
+        <testCase name="index.js routes tests POST /login missing body =&gt; 400" duration="4"/>
+        <testCase name="index.js routes tests POST /login invalid user =&gt; 400" duration="3"/>
+        <testCase name="index.js routes tests POST /login valid =&gt; 200" duration="19"/>
+        <testCase name="index.js routes tests GET /check no token =&gt; 401" duration="3"/>
+        <testCase name="index.js routes tests GET /check invalid token =&gt; 401" duration="3"/>
+        <testCase name="index.js routes tests GET /check valid token =&gt; 200 + user info" duration="3"/>
+        <testCase name="index.js routes tests POST /logout =&gt; 200 + cleared cookie" duration="3"/>
+        <testCase name="index.js routes tests POST /favorites no token =&gt; 401" duration="3"/>
+        <testCase name="index.js routes tests POST /favorites no cryptoId =&gt; 400" duration="3"/>
+        <testCase name="index.js routes tests POST /favorites success =&gt; 201" duration="4"/>
+        <testCase name="index.js routes tests GET /favorites no token =&gt; 401" duration="3"/>
+        <testCase name="index.js routes tests GET /favorites success =&gt; array" duration="2"/>
+        <testCase name="index.js routes tests DELETE /favorites/:cryptoID no token =&gt; 401" duration="5"/>
+        <testCase name="index.js routes tests DELETE /favorites/:cryptoID success =&gt; 200" duration="2"/>
+        <testCase name="index.js routes tests POST /alerts no token =&gt; 401" duration="3"/>
+        <testCase name="index.js routes tests POST /alerts invalid body =&gt; 400" duration="2"/>
+        <testCase name="index.js routes tests POST /alerts success =&gt; 201" duration="3"/>
+        <testCase name="index.js routes tests GET /alerts no token =&gt; 401" duration="2"/>
+        <testCase name="index.js routes tests GET /alerts success =&gt; array" duration="3"/>
+    </file>
+</testExecutions>
