@@ -5,6 +5,7 @@ const sql = require('msnodesqlv8');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const port = 5000;
@@ -399,6 +400,193 @@ app.delete('/favorites/:cryptoID', (req, res) => {
         });
     });
 });
+
+app.post('/alerts', (req, res) => {
+    const token = req.cookies.token;
+
+    if (!token) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    jwt.verify(token, 'jwt-secret-key', (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { username } = decoded; // Extract username from the token
+        const { cryptoId, targetPrice } = req.body;
+
+        if (!cryptoId || !Number.isFinite(targetPrice) || targetPrice <= 0) {
+            return res.status(400).json({ error: 'CryptoID and a valid TargetPrice are required.' });
+        }
+
+        sql.open(dbConfig.connectionString, (err, conn) => {
+            if (err) {
+                console.error('Database connection failed:', err);
+                return res.status(500).json({ error: 'Database connection failed.' });
+            }
+
+            // Fetch UserID based on Username
+            const getUserIdQuery = `SELECT UserID FROM Users WHERE Username = ?`;
+            conn.query(getUserIdQuery, [username], (err, rows) => {
+                if (err || rows.length === 0) {
+                    conn.close();
+                    return res.status(500).json({ error: 'Failed to retrieve UserID.' });
+                }
+
+                const userId = rows[0].UserID;
+
+                // Insert into PriceAlerts table
+                const insertQuery = `
+                    INSERT INTO PriceAlerts (UserID, CryptoID, TargetPrice, IsTriggered) 
+                    VALUES (?, ?, ?, 0)
+                `;
+                conn.query(insertQuery, [userId, cryptoId, targetPrice], (err) => {
+                    conn.close();
+
+                    if (err) {
+                        console.error('Error inserting alert:', err);
+                        return res.status(500).json({ error: 'Failed to create alert.' });
+                    }
+
+                    res.status(201).json({ message: 'Alert created successfully.' });
+                });
+            });
+        });
+    });
+});
+
+const sendEmail = (to, subject, text) => {
+    const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: 'your-email@gmail.com',
+            pass: 'your-email-password',
+        },
+    });
+
+    const mailOptions = {
+        from: 'your-email@gmail.com',
+        to,
+        subject,
+        text,
+    };
+
+    transporter.sendMail(mailOptions, (err, info) => {
+        if (err) {
+            console.error('Error sending email: ', err);
+        } else {
+            console.log('Email sent: ', info.response);
+        }
+    });
+};
+
+// Periodic Price Alert Checker
+setInterval(() => {
+    console.log('Checking price alerts...');
+
+    sql.open(dbConfig.connectionString, (err, conn) => {
+        if (err) {
+            console.error('Database connection failed: ', err);
+            return;
+        }
+
+        const query = `
+            SELECT a.AlertID, a.UserID, a.CryptoID, a.TargetPrice, u.Email, m.Name, d.PriceUSD
+            FROM PriceAlerts a
+            JOIN Users u ON a.UserID = u.UserID
+            JOIN CryptoMapping m ON a.CryptoID = m.CryptoID
+            JOIN CryptoData d ON a.CryptoID = d.CryptoID
+            WHERE a.IsTriggered = 0 AND d.PriceUSD >= a.TargetPrice
+        `;
+
+        conn.query(query, (err, alerts) => {
+            if (err) {
+                conn.close();
+                console.error('Error fetching alerts: ', err);
+                return;
+            }
+
+            alerts.forEach(alert => {
+                sendEmail(
+                    alert.Email,
+                    `Price Alert for ${alert.Name}`,
+                    `The price of ${alert.Name} has reached $${alert.TargetPrice}. Current price is $${alert.PriceUSD}.`
+                );
+
+                const updateQuery = `UPDATE PriceAlerts SET IsTriggered = 1 WHERE AlertID = ?`;
+                conn.query(updateQuery, [alert.AlertID], (err) => {
+                    if (err) {
+                        console.error('Failed to update alert status: ', err);
+                    }
+                });
+            });
+
+            conn.close();
+        });
+    });
+}, 60000); // Check every minute
+
+app.get('/alerts', (req, res) => {
+    const token = req.cookies.token;
+
+    if (!token) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    jwt.verify(token, 'jwt-secret-key', (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { username } = decoded; // Extract username from token
+
+        sql.open(dbConfig.connectionString, (err, conn) => {
+            if (err) {
+                console.error('Database connection failed:', err);
+                return res.status(500).json({ error: 'Database connection failed.' });
+            }
+
+            // Fetch UserID based on Username
+            const getUserIdQuery = `SELECT UserID FROM Users WHERE Username = ?`;
+            conn.query(getUserIdQuery, [username], (err, rows) => {
+                if (err || rows.length === 0) {
+                    conn.close();
+                    return res.status(500).json({ error: 'Failed to retrieve UserID.' });
+                }
+
+                const userId = rows[0].UserID;
+
+                // Fetch alerts for the UserID
+                const query = `
+                    SELECT 
+                        pa.AlertID, 
+                        pa.CryptoID, 
+                        cm.Name AS CryptoName, 
+                        pa.TargetPrice, 
+                        pa.IsTriggered, 
+                        pa.CreatedAt
+                    FROM PriceAlerts pa
+                    JOIN CryptoMapping cm ON pa.CryptoID = cm.CryptoID
+                    WHERE pa.UserID = ?
+                    ORDER BY pa.CreatedAt DESC
+                `;
+
+                conn.query(query, [userId], (err, results) => {
+                    conn.close();
+
+                    if (err) {
+                        console.error('Error fetching alerts:', err);
+                        return res.status(500).json({ error: 'Failed to fetch alerts.' });
+                    }
+
+                    res.json(results);
+                });
+            });
+        });
+    });
+});
+
 
 
 // Start the server

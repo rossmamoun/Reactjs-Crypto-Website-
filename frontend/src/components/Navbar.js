@@ -43,6 +43,9 @@ const Navbar = () => {
                 {isAuthenticated ? (
                     <>
                         <span className="mr-4">Welcome, {username}!</span>
+                        <Link to="/alerts" className="btn btn-accent mr-2">
+                            Set Alerts
+                        </Link>
                         <button className="btn btn-error" onClick={handleLogout}>
                             Logout
                         </button>

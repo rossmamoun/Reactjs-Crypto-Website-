@@ -8,6 +8,7 @@ import Navbar from './components/Navbar';
 import SignUp from './components/SignUp';
 import LogIn from './components/LogIn';
 import Sidebar from './components/Sidebar';
+import PriceAlert from './components/PriceAlert';
 import './App.css';
 
 
@@ -20,6 +21,7 @@ function App() {
           <Sidebar />
           <div className="main-content">
             <Routes>
+              <Route path="/alerts" element={<PriceAlert />} />
               <Route path="/" element={<CryptoList />} />
               <Route path="/crypto/:cryptoId" element={<CryptoDetail />} /> 
               <Route path="/crypto/:cryptoId/candlestick" element={<CandlestickChart />} />
